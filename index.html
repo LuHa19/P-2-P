@@ -57,7 +57,7 @@
     <button id="resetBtn">↻ Reset</button>
 </div>
 
-<canvas id="networkCanvas" width="800" height="450"></canvas>
+<canvas id="networkCanvas" width="800" height="480"></canvas>
 
 <div class="legend">
     <div class="legend-item"><div class="color-box" style="background: #4CAF50;"></div> Has Whole File (100%)</div>
@@ -72,7 +72,7 @@
     let nodes = [];
     let edges = [];
     let packets = [];
-    const maxNodes = 10; // Kept smaller for a cleaner look
+    const maxNodes = 9; // 1 center seeder + 8 outer leechers
     let animationId;
     let isSharing = false;
 
@@ -84,7 +84,7 @@
             this.status = 'empty'; 
             this.chunks = 0;
             this.maxChunks = 4; // Simplified to 4 easy steps (25%, 50%, 75%, 100%)
-            this.radius = 30; // Made larger for visibility
+            this.radius = 32; // Kept large for visibility
         }
         draw() {
             ctx.beginPath();
@@ -102,7 +102,7 @@
             ctx.stroke();
             
             ctx.fillStyle = '#fff';
-            ctx.font = 'bold 14px Arial';
+            ctx.font = 'bold 16px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             
@@ -121,7 +121,7 @@
             ctx.beginPath();
             ctx.moveTo(this.node1.x, this.node1.y);
             ctx.lineTo(this.node2.x, this.node2.y);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
             ctx.lineWidth = 3;
             ctx.stroke();
         }
@@ -141,7 +141,7 @@
             const x = this.source.x + (this.target.x - this.source.x) * this.progress;
             const y = this.source.y + (this.target.y - this.source.y) * this.progress;
             ctx.beginPath();
-            ctx.arc(x, y, 8, 0, Math.PI * 2); // Bigger packet
+            ctx.arc(x, y, 8, 0, Math.PI * 2); 
             ctx.fillStyle = '#00BCD4'; 
             ctx.fill();
             ctx.strokeStyle = '#fff';
@@ -157,19 +157,30 @@
         isSharing = false;
         
         // Add one initial seeder in the center
-        addNode(true, canvas.width / 2, canvas.height / 2);
+        addNode(true);
         
-        // Add initial leechers
-        for(let i=0; i<4; i++) { addNode(false); }
+        // Add initial leechers in a circle
+        for(let i=0; i<5; i++) { addNode(false); }
     }
 
-    function addNode(isSeeder = false, forceX = null, forceY = null) {
+    function addNode(isSeeder = false) {
         if (nodes.length >= maxNodes) return;
         
         const id = nodes.length;
-        const padding = 80;
-        const x = forceX || (padding + Math.random() * (canvas.width - padding * 2));
-        const y = forceY || (padding + Math.random() * (canvas.height - padding * 2));
+        let x, y;
+        
+        if (id === 0) {
+            // Place the first node (Seeder) exactly in the center
+            x = canvas.width / 2;
+            y = canvas.height / 2;
+        } else {
+            // Place subsequent nodes in a perfect circle around the center
+            const radius = 170; // Distance from the center
+            // Distribute them evenly based on maxNodes
+            const angle = (id - 1) * (Math.PI * 2) / (maxNodes - 1);
+            x = (canvas.width / 2) + radius * Math.cos(angle);
+            y = (canvas.height / 2) + radius * Math.sin(angle);
+        }
         
         const newNode = new Node(id, x, y);
         if (isSeeder) {
@@ -178,18 +189,19 @@
         }
         nodes.push(newNode);
         
-        if (nodes.length > 1) {
-            let availableNodes = [...nodes].filter(n => n.id !== newNode.id);
-            availableNodes.sort((a, b) => {
-                let distA = Math.hypot(a.x - newNode.x, a.y - newNode.y);
-                let distB = Math.hypot(b.x - newNode.x, b.y - newNode.y);
-                return distA - distB;
-            });
+        // --- CLEAN TOPOLOGY CONNECTIONS ---
+        if (id > 0) {
+            // 1. Connect new node to the Center Seeder (Node 0)
+            edges.push(new Edge(newNode, nodes[0]));
             
-            // Connect to 2 nearest neighbors to create a visible mesh
-            let numConnections = Math.min(2, availableNodes.length);
-            for(let i=0; i<numConnections; i++) {
-                edges.push(new Edge(newNode, availableNodes[i]));
+            // 2. Connect new node to its immediate neighbor in the circle
+            if (id > 1) {
+                edges.push(new Edge(newNode, nodes[id - 1]));
+            }
+            
+            // 3. If it's the final node, close the circle by connecting it back to the first outer node
+            if (id === maxNodes - 1) {
+                edges.push(new Edge(newNode, nodes[1]));
             }
         }
     }
@@ -228,7 +240,6 @@
         
         nodes.forEach(n => n.draw());
         
-        // Slower dispatch rate so students can follow the logic
         if (isSharing && Math.random() < 0.05) { 
             let senders = nodes.filter(n => n.chunks > 0);
             if (senders.length > 0) {
@@ -236,7 +247,6 @@
                 let neighbors = findNeighbors(sender);
                 let validTargets = neighbors.filter(n => n.chunks < n.maxChunks);
                 
-                // Ensure a sender doesn't flood a single target visually
                 if (validTargets.length > 0 && packets.length < 5) {
                     let target = validTargets[Math.floor(Math.random() * validTargets.length)];
                     packets.push(new Packet(sender, target));
