@@ -49,7 +49,7 @@
 <body>
 
 <h1>How Peer-to-Peer (P2P) Works</h1>
-<p>Notice how there is <strong>no central server</strong>. All computers share the workload equally across the network!</p>
+<p>Notice how there is <strong>no central server</strong>. All computers share the workload equally across the mesh!</p>
 
 <div id="controls">
     <button id="addNodeBtn">+ Add a Computer</button>
@@ -79,7 +79,7 @@
     class Node {
         constructor(id) {
             this.id = id;
-            this.x = 0; // X and Y are set dynamically
+            this.x = 0; 
             this.y = 0; 
             this.status = 'empty'; 
             this.chunks = 0;
@@ -131,13 +131,13 @@
             this.source = source;
             this.target = target;
             this.progress = 0;
-            this.speed = 0.008; // SLOWED DOWN for classroom viewing
+            // VERY SLOW SPEED: Takes time to travel so students can observe
+            this.speed = 0.003; 
         }
         update() {
             this.progress += this.speed;
         }
         draw() {
-            // Because source/target are objects, if they move, the packet adapts instantly!
             const x = this.source.x + (this.target.x - this.source.x) * this.progress;
             const y = this.source.y + (this.target.y - this.source.y) * this.progress;
             ctx.beginPath();
@@ -162,7 +162,7 @@
     }
 
     function updateLayout() {
-        const radius = 170; // Radius of the circle
+        const radius = 170; 
         
         // Arrange computers in a perfect, centered circle
         nodes.forEach((node, index) => {
@@ -175,10 +175,9 @@
         edges = [];
         for (let i = 0; i < nodes.length; i++) {
             for (let j = i + 1; j < nodes.length; j++) {
-                // Find shortest distance around the ring
                 let distance = Math.min(j - i, nodes.length - (j - i));
                 
-                // Connect to immediate neighbors (distance 1) and skip-one neighbors (distance 2)
+                // Connect to immediate neighbors and skip-one neighbors
                 if (distance === 1 || distance === 2) {
                     edges.push(new Edge(nodes[i], nodes[j]));
                 }
@@ -196,7 +195,6 @@
         }
         nodes.push(newNode);
         
-        // Refresh the circle shape and connections
         updateLayout();
     }
 
@@ -234,14 +232,16 @@
         
         nodes.forEach(n => n.draw());
         
-        if (isSharing && Math.random() < 0.05) { 
+        // SLOWER DISPATCH RATE: Wait longer before sending next packet
+        if (isSharing && Math.random() < 0.02) { 
             let senders = nodes.filter(n => n.chunks > 0);
             if (senders.length > 0) {
                 let sender = senders[Math.floor(Math.random() * senders.length)];
                 let neighbors = findNeighbors(sender);
                 let validTargets = neighbors.filter(n => n.chunks < n.maxChunks);
                 
-                if (validTargets.length > 0 && packets.length < 6) {
+                // Keep max packets slightly lower to avoid clutter
+                if (validTargets.length > 0 && packets.length < 4) {
                     let target = validTargets[Math.floor(Math.random() * validTargets.length)];
                     packets.push(new Packet(sender, target));
                 }
